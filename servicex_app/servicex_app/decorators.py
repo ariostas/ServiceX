@@ -4,6 +4,7 @@ from typing import Callable
 from flask import (
     Response,
     current_app,
+    g,
     make_response,
     redirect,
     request,
@@ -50,7 +51,6 @@ def jwt_required_if_auth_enabled(*dargs, **dkwargs):
     return decorate
 
 
-@jwt_required_if_auth_enabled
 def get_jwt_user():
     user = UserModel.find_by_email(get_jwt_identity())
 
@@ -112,6 +112,9 @@ def auth_required(fn: Callable[..., Response]) -> Callable[..., Response]:
                     return make_response({"message": no_user_msg}, 401)
                 elif user.pending:
                     return make_response({"message": pending_msg}, 401)
+
+                # Let the resource reuse the user instead of looking it up again
+                g.requesting_user = user
             return fn(*args, **kwargs)
         try:
             verify_jwt_in_request(locations=["headers"])
@@ -128,6 +131,9 @@ def auth_required(fn: Callable[..., Response]) -> Callable[..., Response]:
                 return make_response({"message": no_user_msg}, 401)
             elif user.pending:
                 return make_response({"message": pending_msg}, 401)
+
+            # Let the resource reuse the user instead of looking it up again
+            g.requesting_user = user
 
         return fn(*args, **kwargs)
 
