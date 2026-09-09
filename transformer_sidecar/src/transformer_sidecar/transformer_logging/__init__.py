@@ -108,12 +108,17 @@ def initialize_logging(log=None, **kwargs):
     :return: logger with correct formatting that outputs to console
     """
 
-    logging.basicConfig(level=logging.INFO, force=True)
-
     if log is None:
         log = logging.getLogger()
 
     log.setLevel(logging.INFO)
+
+    # Drop any handler that is already installed so that we don't log twice. Close
+    # them too, since a logstash handler holds on to a socket.
+    for handler in log.handlers[:]:
+        log.removeHandler(handler)
+        handler.close()
+
     stream_handler = logging.StreamHandler()
     stream_formatter = StreamFormatter(
         "%(levelname)s " + f"{instance} transformer sidecar " + "%(message)s"
@@ -170,9 +175,9 @@ def _initialize_vector_logging(log):
         )
         _vector_listener.start()
 
-    # basicConfig(force=True) only closes the root logger's handlers, so a
-    # handler this function attached to some other logger can still be here.
-    # Feeding the shared queue twice would double every record.
+    # initialize_logging() drops the handlers already on this logger, but stay
+    # safe if a handler feeding the shared queue is still here: feeding the
+    # queue twice would double every record.
     if any(
         isinstance(handler, QueueHandler) and handler.queue is _vector_queue
         for handler in log.handlers

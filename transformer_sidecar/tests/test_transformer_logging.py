@@ -349,3 +349,42 @@ def test_initialize_logging_adds_logstash_handler(
     assert any(
         isinstance(f, transformer_logging.RequestIdFilter) for f in handler.filters
     )
+
+
+class RecordingHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.closed = False
+
+    def emit(self, record):
+        pass
+
+    def close(self):
+        self.closed = True
+        super().close()
+
+
+def test_initialize_logging_twice(monkeypatch, capsys):
+    monkeypatch.delenv("LOGSTASH_HOST", raising=False)
+    monkeypatch.delenv("VECTOR_HOST", raising=False)
+    log = logging.getLogger("test_initialize_logging_twice")
+    log.propagate = False
+
+    # The sidecar initializes logging at import time, and again once celery has
+    # installed its own handler
+    initialize_logging(log)
+    first_handler = log.handlers[0]
+    celery_handler = RecordingHandler()
+    log.addHandler(celery_handler)
+
+    initialize_logging(log)
+
+    assert len(log.handlers) == 1
+    assert isinstance(log.handlers[0], logging.StreamHandler)
+    assert log.handlers[0] is not first_handler
+
+    # Handlers that are dropped are closed, so a logstash socket isn't leaked
+    assert celery_handler.closed
+
+    log.info("only once")
+    assert capsys.readouterr().err.count("only once") == 1
