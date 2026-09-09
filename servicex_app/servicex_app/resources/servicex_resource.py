@@ -31,6 +31,7 @@ from importlib.metadata import version, PackageNotFoundError
 from flask import current_app, g, session
 from flask_jwt_extended import get_jwt_identity
 from flask_restful import Resource, abort
+from servicex_app.advertised_endpoint import advertised_endpoint
 from servicex_app.models import UserModel, TransformRequest
 
 from servicex_app.decorators import jwt_required_if_auth_enabled
@@ -45,7 +46,7 @@ class ServiceXResource(Resource):
 
     @classmethod
     def _generate_advertised_endpoint(cls, endpoint):
-        return "http://" + current_app.config["ADVERTISED_HOSTNAME"] + "/" + endpoint
+        return advertised_endpoint(endpoint)
 
     @staticmethod
     def get_requesting_user() -> Optional[UserModel]:
