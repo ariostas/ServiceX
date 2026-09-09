@@ -1,15 +1,14 @@
-from flask import render_template, abort, current_app, request
+from flask import render_template, current_app, request
 
 from servicex_app.decorators import oauth_required
-from servicex_app.models import TransformRequest, LogMessage
+from servicex_app.models import LogMessage
+from servicex_app.resources.servicex_resource import ServiceXResource
 
 
 @oauth_required
 def transformation_request(id_: str):
     current_app.logger.debug(f"Got transformation request: {id_}")
-    req = TransformRequest.lookup(id_)
-    if not req:
-        abort(404)
+    req = ServiceXResource.get_owned_request(id_)
 
     page = request.args.get("page", 1, type=int)
     log_level = request.args.get("log_level", "").upper()
