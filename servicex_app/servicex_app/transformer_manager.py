@@ -51,6 +51,24 @@ def _is_retryable_api_error(exc: BaseException) -> bool:
     return isinstance(exc, urllib3.exceptions.HTTPError)
 
 
+def shutdown_finished_transformers(
+    transformer_manager: "TransformerManager", request_ids: list[str], namespace: str
+) -> None:
+    """
+    Shut down the transformers of requests whose terminal status has already been
+    committed. Call this after the commit: a Kubernetes failure is only logged, so it
+    can neither roll the status back nor keep the other requests from shutting down.
+    The reaper removes whatever is left behind once it is old enough.
+    """
+    for request_id in request_ids:
+        try:
+            transformer_manager.shutdown_transformer_job(request_id, namespace)
+        except Exception:
+            current_app.logger.exception(
+                "Failed to shut down transformers", extra={"request_id": request_id}
+            )
+
+
 class TransformerManager:
     POSIX_VOLUME_MOUNT = "/posix_volume"
 
@@ -817,6 +835,6 @@ class TransformerManager:
 
     def cancel_transform(self, request: TransformRequest):
         namespace = current_app.config["TRANSFORMER_NAMESPACE"]
-        if request.status in (TransformStatus.running, TransformStatus.lookup):
+        if not request.status.is_complete:
             # shutdown_transformer_job handles and logs Kubernetes API errors itself
             self.shutdown_transformer_job(request.request_id, namespace)
