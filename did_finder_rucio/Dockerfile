@@ -24,16 +24,17 @@ ENV POETRY_VERSION=2.1.1
 # python3.11, but that path belongs to AlmaLinux's python3 (3.9) rpm, so the `yum -y
 # update` above hands it back to 3.9 -- which has no pip. pyproject requires ^3.11
 # anyway, so name the interpreter we actually want.
-RUN python3.11 -m pip install --upgrade pip
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip
 
-RUN python3.11 -m pip install poetry==$POETRY_VERSION
+RUN python3.11 -m pip install --no-cache-dir poetry==$POETRY_VERSION
 RUN mkdir -p /opt/servicex/pypoetry
 COPY pyproject.toml pyproject.toml
 COPY poetry.lock poetry.lock
 
 ENV XDG_CONFIG_HOME=/opt/servicex
 RUN poetry config virtualenvs.in-project true
-RUN poetry install --no-root --no-interaction --no-ansi
+RUN poetry install --no-root --no-interaction --no-ansi && \
+    rm -rf "$(poetry config cache-dir)"
 
 COPY . .
 
